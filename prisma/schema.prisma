@@ -1,0 +1,75 @@
+// DevHub — Prisma schema
+// Run `npx prisma migrate dev --name init` after setting DATABASE_URL.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  username  String   @unique
+  password  String
+  name      String?
+  avatarUrl String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  favoriteDevelopers FavoriteDeveloper[]
+  favoriteRepos      FavoriteRepo[]
+
+  @@map("users")
+}
+
+/// A GitHub developer a registered user has bookmarked.
+model FavoriteDeveloper {
+  id             String   @id @default(cuid())
+  userId         String
+  githubUsername String
+  note           String?
+  createdAt      DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, githubUsername])
+  @@index([userId])
+  @@map("favorite_developers")
+}
+
+/// A GitHub repository a registered user has bookmarked.
+model FavoriteRepo {
+  id        String   @id @default(cuid())
+  userId    String
+  owner     String
+  repoName  String
+  note      String?
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, owner, repoName])
+  @@index([userId])
+  @@map("favorite_repos")
+}
+
+/// Server-side cache of raw GitHub API payloads, keyed by a normalized
+/// cache key (see lib/github.ts). Used to avoid burning GitHub's rate
+/// limit and to serve stale data gracefully if GitHub is unavailable.
+model GithubCache {
+  id        String   @id @default(cuid())
+  cacheKey  String   @unique
+  endpoint  String
+  payload   Json
+  etag      String?
+  fetchedAt DateTime @default(now())
+  expiresAt DateTime
+
+  @@index([cacheKey])
+  @@index([expiresAt])
+  @@map("github_cache")
+}
